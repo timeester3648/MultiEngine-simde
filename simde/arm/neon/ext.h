@@ -61,7 +61,8 @@ simde_vext_f16(simde_float16x4_t a, simde_float16x4_t b, const int n)
     return simde_float16x4_from_private(r_);
   #endif
 }
-#if defined(SIMDE_ARM_NEON_A32V7_ENABLE_NATIVE_ALIASES)
+#if defined(SIMDE_ARM_NEON_A32V7_ENABLE_NATIVE_ALIASES) || (defined(SIMDE_ENABLE_NATIVE_ALIASES) && \
+  !(defined(SIMDE_ARM_NEON_FP16)))
   #undef vext_f16
   #define vext_f16(a, b, n) simde_vext_f16((a), (b), (n))
 #endif
@@ -507,7 +508,8 @@ simde_vextq_f16(simde_float16x8_t a, simde_float16x8_t b, const int n)
     return simde_float16x8_from_private(r_);
   #endif
 }
-#if defined(SIMDE_ARM_NEON_A32V7_ENABLE_NATIVE_ALIASES)
+#if defined(SIMDE_ARM_NEON_A32V7_ENABLE_NATIVE_ALIASES) || (defined(SIMDE_ENABLE_NATIVE_ALIASES) && \
+  !(defined(SIMDE_ARM_NEON_FP16)))
   #undef vextq_f16
   #define vextq_f16(a, b, n) simde_vextq_f16((a), (b), (n))
 #endif
@@ -1075,7 +1077,7 @@ simde_vext_p64(simde_poly64x1_t a, simde_poly64x1_t b, const int n)
     const size_t n_ = HEDLEY_STATIC_CAST(size_t, n);
     for (size_t i = 0 ; i < (sizeof(r_.values) / sizeof(r_.values[0])) ; i++) {
       size_t src = i + n_;
-      r_.values[i] = (src < (sizeof(r_.values) / sizeof(r_.values[0]))) ? a_.values[src] : b_.values[src & 0];
+      r_.values[i] = (src >= (sizeof(r_.values) / sizeof(r_.values[0]))) ? b_.values[src & 0] : a_.values[src];
     }
     return simde_poly64x1_from_private(r_);
   #endif
