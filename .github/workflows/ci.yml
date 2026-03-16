@@ -16,24 +16,24 @@ concurrency:
 
 jobs:
   checkinstall:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-slim
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 2
     - name: Install APT Dependencies
       run: |
-        sudo apt-get install -y --no-install-recommends ninja-build ninja-build pipx
-        pipx install meson==0.55.1
+        sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build
+        pipx install meson==1.3.2
     - run: |
         meson setup build --prefix "$PWD/install" -Dtests=false
         meson install -C build --quiet
         diff <(find simde/ -type f -name "*.h")  <(cd install/include/; find simde -type f -name "*.h" )
 
   formatting:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 2
     - name: Install pcre2grep
@@ -126,25 +126,27 @@ jobs:
       CXXFLAGS: -Wall -Wextra -Werror ${{ matrix.isax }}
       INTEL_TARGET: ${{ matrix.target }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - name: CPU Information
       run: cat /proc/cpuinfo
-    - run: sudo add-apt-repository ppa:stephanosio/ccache && sudo apt-get update
+    - name: Install APT Dependencies
+      run: |
+        sudo add-apt-repository ppa:daawesomep/toolchain-backports-noble
+        sudo add-apt-repository ppa:stephanosio/ccache
+        sudo apt-get install -y --no-install-recommends ninja-build pipx \
+          gcc-15 g++-15 ccache
+        sudo apt-get satisfy -y 'binutils (>= 2.45)'
+        sudo apt-get purge -y gcc g++
+        sudo ln -s /usr/bin/gcc-15 /usr/bin/gcc
+        sudo ln -s /usr/bin/g++-15 /usr/bin/g++
+        pipx install meson==1.3.2
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}-${{ matrix.isax }}
-        evict-old-files: job
         verbose: 2
-    - name: Install APT Dependencies
-      run: |
-        sudo apt-get install -y --no-install-recommends ninja-build ninja-build pipx gcc-14 g++-14
-        sudo apt-get purge -y gcc g++
-        sudo ln -s /usr/bin/gcc-14 /usr/bin/gcc
-        sudo ln -s /usr/bin/g++-14 /usr/bin/g++
-        pipx install meson==0.55.1
     - name: add ccache to the build path
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
@@ -162,33 +164,34 @@ jobs:
         meson test -C build --print-errorlogs --wrapper "${GITHUB_WORKSPACE}/test/check-flags.sh sde" $(meson test -C build --list | grep -v emul)
 
   x86-xop:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
     env:
       CFLAGS: -Wall -Wextra -Werror -march=bdver2
       CXXFLAGS: -Wall -Wextra -Werror -march=bdver2
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - name: CPU Information
       run: cat /proc/cpuinfo
-    - run: sudo add-apt-repository ppa:stephanosio/ccache && sudo apt-get update
+    - name: Install APT Dependencies
+      run: |
+        sudo add-apt-repository ppa:daawesomep/toolchain-backports-noble
+        sudo add-apt-repository ppa:stephanosio/ccache
+        sudo apt-get install -y --no-install-recommends ninja-build pipx \
+          g++-15 gcc-15 qemu-user-static ccache
+        sudo apt-get satisfy -y 'binutils (>= 2.45)'
+        sudo apt-get purge -y gcc g++
+        sudo ln -s /usr/bin/gcc-15 /usr/bin/gcc
+        sudo ln -s /usr/bin/g++-15 /usr/bin/g++
+        pipx install meson==1.3.2
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{ github.job }}-
-        evict-old-files: job
+        key: ${{ github.job }}
         verbose: 2
-    - name: Install APT Dependencies
-      run: |
-        #sudo add-apt-repository ppa:aschultz/backports
-        sudo apt-get install -y --no-install-recommends ninja-build ninja-build pipx g++-12 gcc-12 qemu-user-static
-        # sudo apt-get purge -y gcc g++
-        # sudo ln -s /usr/bin/gcc-12 /usr/bin/gcc
-        # sudo ln -s /usr/bin/g++-12 /usr/bin/g++
-        pipx install meson==0.55.1
     - name: add ccache to the build path
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
@@ -210,26 +213,25 @@ jobs:
           - "32-relaxed"
           - "64-relaxed"
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
-    - run: sudo add-apt-repository ppa:stephanosio/ccache && sudo apt-get update
+    - name: Install APT Dependencies
+      run: |
+        sudo add-apt-repository ppa:stephanosio/ccache
+        sudo apt-get install -y --no-install-recommends ninja-build pipx ccache
+        pipx install meson==1.3.2
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}
-        evict-old-files: job
         verbose: 2
-    - name: Install APT Dependencies
-      run: |
-        sudo apt-get install -y --no-install-recommends ninja-build ninja-build pipx &&\
-        pipx install meson==0.55.1
     - name: Install emscripten
       run: |
         git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk
         cd /opt/emsdk
-        ./emsdk install tot
-        ./emsdk activate tot
+        ./emsdk install latest  # FIXME, revert to tot
+        ./emsdk activate latest  # FIXME, revert to tot
         source emsdk_env.sh
     - name: Install v8
       run: |
@@ -252,23 +254,31 @@ jobs:
       CFLAGS: -DSIMDE_ENABLE_NATIVE_ALIASES -DSIMDE_NATIVE_ALIASES_TESTING -Wall -Wextra -Werror -pedantic
       CXXFLAGS: -DSIMDE_ENABLE_NATIVE_ALIASES -DSIMDE_NATIVE_ALIASES_TESTING -Wall -Wextra -Werror -pedantic
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - id: cpu
       name: CPU Information
       run: cat /proc/cpuinfo
-    - run: sudo add-apt-repository ppa:stephanosio/ccache && sudo apt-get update
+    - name: Install APT Dependencies
+      run: |
+        sudo add-apt-repository ppa:daawesomep/toolchain-backports-noble
+        sudo add-apt-repository ppa:stephanosio/ccache
+        sudo apt-get -y --no-install-recommends install libxml2-utils \
+          ninja-build pipx ccache gcc-15 g++-15
+        sudo apt-get satisfy -y 'binutils (>= 2.45)'
+        sudo apt-get purge -y gcc g++
+        sudo ln -s /usr/bin/gcc-15 /usr/bin/gcc
+        sudo ln -s /usr/bin/g++-15 /usr/bin/g++
+        pipx install meson==1.3.2
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}
-        evict-old-files: job
         verbose: 2
-    - name: Install APT Dependencies
+    - name: add ccache to the build path
       run: |
-        sudo apt-get -y --no-install-recommends install libxml2-utils ninja-build pipx && \
-        pipx install meson==0.55.1
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
     - name: Convert
       run: ./test/native-aliases.sh
     - name: Configure
@@ -284,25 +294,32 @@ jobs:
       CFLAGS: -march=native -Wall -Wextra -Werror
       CXXFLAGS: -march=native -Wall -Wextra -Werror
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - id: cpu
       name: CPU Information
       run: |
         cat /proc/cpuinfo
-        echo "model_name=$(grep -m1 'model name' < /proc/cpuinfo | awk '-F: ' '{ print $2}' | tr '-' '_')" >> "$GITHUB_OUTPUT"
-    - run: sudo add-apt-repository ppa:stephanosio/ccache && sudo apt-get update
+    - name: Install APT Dependencies
+      run: |
+        sudo add-apt-repository ppa:daawesomep/toolchain-backports-noble
+        sudo add-apt-repository ppa:stephanosio/ccache
+        sudo apt-get install -y --no-install-recommends ninja-build libsleef-dev \
+          pipx ccache gcc-15 g++-15
+        sudo apt-get satisfy -y 'binutils (>= 2.45)'
+        sudo apt-get purge -y gcc g++
+        sudo ln -s /usr/bin/gcc-15 /usr/bin/gcc
+        sudo ln -s /usr/bin/g++-15 /usr/bin/g++
+        pipx install meson==1.3.2
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{ github.job }}-${{ steps.cpu.outputs.model_name }}
-        evict-old-files: job
+        key: ${{ github.job }}
         verbose: 2
-    - name: Install APT Dependencies
+    - name: add ccache to the build path
       run: |
-        sudo apt-get install -y --no-install-recommends ninja-build ninja-build libsleef-dev pipx
-        pipx install meson==0.55.1
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
     - name: Configure
       run: meson setup build -Dsleef=enabled
     - name: Build
@@ -331,6 +348,9 @@ jobs:
           arch_flags: -ffast-math
         - version: 11
           distro:  ubuntu-24.04-arm
+        - version: 11
+          distro: ubuntu-24.04-arm
+          plain: true
         - version: 12
           distro: ubuntu-24.04
         - version: 12
@@ -354,102 +374,113 @@ jobs:
           distro: ubuntu-24.04-arm
         - version: 15
           distro: ubuntu-24.04
+        - version: 15
+          distro: ubuntu-24.04
+          arch_flags: -ffast-math
+        - version: 15
+          distro: ubuntu-24.04-arm
+        - version: 15
+          distro: ubuntu-24.04-arm
+          plain: true
+        - version: 15  # plain armhf
+          distro: ubuntu-24.04-arm
+          gcc: arm-linux-gnueabihf
+          plain: true
+        - version: 15  # armv7
+          distro: ubuntu-24.04-arm
+          gcc: arm-linux-gnueabihf
+          arch_flags: -march=armv7-a+simd+neon-fp16
+          plain: true
+        - version: 15  # armv8 32-bit
+          distro: ubuntu-24.04-arm
+          gcc: arm-linux-gnueabihf
+          arch_flags: -mcpu=cortex-a32 -mfpu=crypto-neon-fp-armv8
+          plain: true
     runs-on: ${{ matrix.distro }}
     env:
-      CFLAGS: ${{ matrix.arch_flags }} -march=native -Wall -Wextra -Werror
-      CXXFLAGS: ${{ matrix.arch_flags }} -march=native -Wall -Wextra -Werror
+      CFLAGS: ${{ matrix.arch_flags }} ${{ case(
+        matrix.plain == true, '-Wall -Wextra -Werror',
+        '-march=native -Wall -Wextra -Werror') }}
+      CXXFLAGS: ${{ matrix.arch_flags }} ${{ case(
+        matrix.plain == true, '-Wall -Wextra -Werror',
+        '-march=native -Wall -Wextra -Werror') }}
+      CCBIN: ${{
+        case(
+          matrix.gcc == '', format('gcc-{0}', matrix.version),
+          format('{0}-gcc-{1}', matrix.gcc, matrix.version)
+        ) }}
+      CXXBIN: ${{
+        case(
+          matrix.gcc == '', format('g++-{0}', matrix.version),
+          format('{0}-g++-{1}', matrix.gcc, matrix.version)
+        ) }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - id: cpu
       name: CPU Information
       run: |
         cat /proc/cpuinfo
-        echo "model_name=$(grep -m1 'model name' < /proc/cpuinfo || grep -m1 Features < /proc/cpuinfo | awk '-F: ' '{ print $2}' | tr '-' '_')" >> "$GITHUB_OUTPUT"
-    - run: sudo add-apt-repository ppa:stephanosio/ccache && sudo apt-get update
-    - name: ccache
-      uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        key: ${{ github.job }}-${{ matrix.version }}-${{ matrix.distro }}-${{ matrix.arch_flags }}-${{ steps.cpu.outputs.model_name }}
-        evict-old-files: job
-        verbose: 2
+    - name: enable armhf
+      if: ${{ contains(matrix.gcc,'arm-linux-gnueabihf') }}
+      run: sudo dpkg --add-architecture armhf && sudo apt-get update && sudo apt-get install -y libstdc++6:armhf
     - name: Install APT Dependencies
       run: |
+        sudo add-apt-repository ppa:stephanosio/ccache
+        sudo add-apt-repository ppa:daawesomep/toolchain-backports-noble
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test
         sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
         sudo add-apt-repository ppa:cppiber/build-depends
-        sudo apt-get update
-        sudo apt-get -y install --no-install-recommends gcovr pipx ninja-build gcc-${{ matrix.version }} g++-${{ matrix.version }}
+        sudo apt-get -y install --no-install-recommends pipx ninja-build \
+          ccache gcc-${{ case(matrix.gcc == '', matrix.version, format('{0}-{1}', matrix.version, matrix.gcc)) }} \
+          g++-${{ case(matrix.gcc == '', matrix.version, format('{0}-{1}', matrix.version, matrix.gcc)) }}
         sudo apt-get -y purge g++ gcc
-        pipx install meson==0.55.1
+        pipx install meson==1.3.2
+    - if: ${{ matrix.version == '15' }}
+      run: sudo apt-get satisfy -y 'binutils (>= 2.45)'
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ github.job }}-${{ matrix.version }}-${{ matrix.distro }}-${{ matrix.arch_flags }}
+        verbose: 2
     - name: add ccache to the build path
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        sudo ln -s /usr/bin/gcc-${{ matrix.version }} /usr/bin/gcc
-        sudo ln -s /usr/bin/g++-${{ matrix.version }} /usr/bin/g++
-        sudo ln -s /usr/bin/gcov-${{ matrix.version }} /usr/bin/gcov
+        sudo ln -s "/usr/bin/${CCBIN}" /usr/bin/gcc
+        sudo ln -s "/usr/bin/${CXXBIN}" /usr/bin/g++
     - name: Configure
-      run: meson setup build
+      run: meson setup build || (cat build/meson-logs/meson-log.txt ; false)
     - name: Build
       run: meson compile -C build --verbose
     - name: Test
       run: |
         # shellcheck disable=SC2046
-        meson test -C build --print-errorlogs $(meson test -C build --list | grep -v emul)
+        meson test -C build --print-errorlogs
 
   gcc-qemu:
     strategy:
       fail-fast: false
       matrix:
         include:
-        - version: 11
-          cross: aarch64
-          arch_gnu: aarch64
-          arch_deb: arm64
-          distro: ubuntu-22.04
         - version: 14
           cross: armel
           arch_gnu_abi: eabi
           arch_deb: armel
           arch_gnu: arm
           distro: ubuntu-24.04
-        - version: 14
-          cross: armv7
-          arch_gnu: arm
-          arch_gnu_abi: eabihf
-          arch_deb: armhf
-          distro: ubuntu-24.04
-        - version: 14
-          extra: -no-extras
-          cross: aarch64
-          arch_gnu: aarch64
-          arch_deb: arm64
-          distro: ubuntu-24.04
-        - version: 14
-          cross: aarch64
-          arch_gnu: aarch64
-          arch_deb: arm64
-          distro: ubuntu-24.04
-        - extra: -32bit
-          version: 14
-          cross: armv8
-          arch_gnu: arm
-          arch_gnu_abi: eabihf
-          arch_deb: armhf
-          distro: ubuntu-24.04
-        - version: 14
+        - version: 15
           cross: riscv64
           arch_gnu: riscv64
           arch_deb: riscv64
           distro: ubuntu-24.04
         - extra: -O3
-          version: 14
+          version: 15
           cross: riscv64
           arch_gnu: riscv64
           arch_deb: riscv64
           distro: ubuntu-24.04
-        - version: 14
+        - version: 15
           cross: s390x
           arch_gnu: s390x
           arch_deb: s390x
@@ -472,25 +503,27 @@ jobs:
         #   distro: ubuntu-24.04
     runs-on: ${{ matrix.distro }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - name: CPU Information
       run: cat /proc/cpuinfo
+    - if: ${{ matrix.distro == 'ubuntu-24.04' && ( matrix.version == '15' )}}
+      run:
+        sudo add-apt-repository ppa:daawesomep/toolchain-backports-noble
     - name: Install APT Dependencies
       run: |
         sudo add-apt-repository ppa:stephanosio/ccache
         sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
-        sudo apt-get update && sudo apt-get -y --no-install-recommends install ccache ninja-build \
+        sudo apt-get -y --no-install-recommends install ccache ninja-build \
           gcc-${{ matrix.version }}-${{ matrix.arch_gnu }}-linux-gnu${{ matrix.arch_gnu_abi }} \
           g++-${{ matrix.version }}-${{ matrix.arch_gnu }}-linux-gnu${{ matrix.arch_gnu_abi }} binfmt-support \
           qemu-user-static pipx libc6-${{ matrix.arch_deb }}-cross libstdc++-${{ matrix.version }}-dev-${{ matrix.arch_deb }}-cross
-        pipx install meson==0.55.1
+        pipx install meson==1.3.2
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}-${{ matrix.version}}${{ matrix.extra }}-${{ matrix.distro }}-${{ matrix.cross }}
-        evict-old-files: job
         verbose: 2
     - name: add ccache to the build path
       run: |
@@ -502,7 +535,7 @@ jobs:
     - name: Test
       run: |
         # shellcheck disable=SC2046
-        meson test -C build --print-errorlogs --print-errorlogs $(meson test -C build --list | grep -v emul)
+        meson test -C build --print-errorlogs
 
   clang17-qemu-rvv:
     strategy:
@@ -526,7 +559,7 @@ jobs:
           distro: ubuntu-24.04
     runs-on: ${{ matrix.distro }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - name: CPU Information
@@ -536,9 +569,8 @@ jobs:
         #add-apt-repository ppa:savoury1/virtualisation
         #add-apt-repository ppa:savoury1/display
         sudo add-apt-repository ppa:stephanosio/ccache
-        sudo apt-get update -y
         sudo apt-get install -y --no-install-recommends ccache ninja-build pkg-config \
-          qemu-user-static clang-${{ matrix.version }} ninja-build binfmt-support \
+          qemu-user-static clang-${{ matrix.version }} binfmt-support \
           libc6-${{ matrix.arch_deb }}-cross meson llvm-${{ matrix.version }} \
           libstdc++-12-dev-${{ matrix.arch_deb }}-cross \
           binutils-${{ matrix.arch_gnu }}-linux-gnu
@@ -546,7 +578,6 @@ jobs:
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}-${{ matrix.distro }}-${{ matrix.cross }}
-        evict-old-files: job
         verbose: 2
     - name: add ccache to the build path
       run: |
@@ -560,7 +591,7 @@ jobs:
     - name: Test
       run: |
         # shellcheck disable=SC2046
-        meson test -C build --print-errorlogs --print-errorlogs $(meson test -C build --list | grep -v emul)
+        meson test -C build --print-errorlogs $(meson test -C build --list | grep -v emul)
 
   clang18-qemu-rvv:
     strategy:
@@ -584,7 +615,7 @@ jobs:
           distro: ubuntu-24.04
     runs-on: ${{ matrix.distro }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - name: CPU Information
@@ -592,16 +623,15 @@ jobs:
     - name: Install APT Dependencies
       run: |
         sudo add-apt-repository ppa:stephanosio/ccache
-        sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+        sudo apt-get install -y --no-install-recommends \
           ninja-build pkg-config qemu-user-static clang-${{ matrix.version }} \
-          ninja-build binfmt-support libc6-${{ matrix.arch_deb }}-cross meson \
+          binfmt-support libc6-${{ matrix.arch_deb }}-cross meson \
           libstdc++-12-dev-${{ matrix.arch_deb }}-cross \
           binutils-${{ matrix.arch_gnu }}-linux-gnu ccache
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}-${{ matrix.distro }}-${{ matrix.cross }}
-        evict-old-files: job
         verbose: 2
     - name: add ccache to the build path
       run: |
@@ -615,37 +645,26 @@ jobs:
     - name: Test
       run: |
         # shellcheck disable=SC2046
-        meson test -C build --print-errorlogs --print-errorlogs $(meson test -C build --list | grep -v emul)
+        meson test -C build --print-errorlogs $(meson test -C build --list | grep -v emul)
 
   clang-qemu:
     strategy:
       fail-fast: false
       matrix:
         include:
-        - version: 20
-          cross: armv7
-          arch_deb: armhf
-          arch_gnu_abi: eabihf
-          arch_gnu: arm
-          distro: ubuntu-24.04
-        - version: 20
-          cross: aarch64
-          arch_gnu: aarch64
-          arch_deb: arm64
-          distro: ubuntu-24.04
-        - version: 20
-          extra: -no-extras
-          cross: aarch64
-          arch_gnu: aarch64
-          arch_deb: arm64
-          distro: ubuntu-24.04
-        - version: 20
+        # - version: 18
+        #   cross: mips64el
+        #   arch_deb: mips64el
+        #   arch_gnu: mips64el
+        #   arch_gnu_abi: abi64
+        #   distro: ubuntu-24.04
+        - version: 21
           cross: armel
           arch_gnu_abi: eabi
           arch_deb: armel
           arch_gnu: arm
           distro: ubuntu-24.04
-        - version: 20
+        - version: 21
           cross: riscv64
           arch_gnu: riscv64
           arch_deb: riscv64
@@ -655,33 +674,29 @@ jobs:
           arch_gnu: s390x
           arch_deb: s390x
           distro: ubuntu-24.04
-        - version: 20
+        - version: 21
           cross: ppc64el
           arch_deb: ppc64el
           arch_gnu: powerpc64le
           distro: ubuntu-24.04
-        # - version: 18
-        #   cross: mips64el
-        #   arch_deb: mips64el
-        #   arch_gnu: mips64el
-        #   arch_gnu_abi: abi64
-        #   distro: ubuntu-24.04
-        - version: 20
+        - version: 21
           cross: loongarch64
           arch_deb: loong64
           arch_gnu: loongarch64
           distro: ubuntu-24.04
     runs-on: ${{ matrix.distro }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - name: CPU Information
       run: cat /proc/cpuinfo
     - name: Install APT Dependencies
       run: |
-        sudo add-apt-repository ppa:stephanosio/ccache && \
-        sudo apt-get update -y && \
+        sudo add-apt-repository ppa:stephanosio/ccache
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{ matrix.version }}
         sudo apt-get -y --no-install-recommends install ccache ninja-build \
           binfmt-support clang-${{ matrix.version }} llvm-${{ matrix.version }} lld-${{ matrix.version }} \
           qemu-user-static pipx libc6-${{ matrix.arch_deb }}-cross libstdc++-14-dev-${{ matrix.arch_deb }}-cross \
@@ -690,22 +705,21 @@ jobs:
     - name: ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{ github.job }}-${{ matrix.version }}${{ matrix.extra }}-${{ matrix.cross }}
-        evict-old-files: job
+        key: ${{ github.job }}-${{ matrix.version }}-${{ matrix.cross }}
         verbose: 2
     - name: add ccache to the build path
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
     - name: Configure
       run: |
-        meson setup --cross-file=docker/cross-files/${{ matrix.cross }}-clang-${{ matrix.version }}${{ matrix.extra }}-ccache.cross build \
+        meson setup --cross-file=docker/cross-files/${{ matrix.cross }}-clang-${{ matrix.version }}-ccache.cross build \
           || (cat build/meson-logs/meson-log.txt ; false)
     - name: Build
       run: ninja -C build -v
     - name: Test
       run: |
         # shellcheck disable=SC2046
-        meson test -C build --print-errorlogs --print-errorlogs $(meson test -C build --list | grep -v emul)
+        meson test -C build --print-errorlogs
 
   clang:
     strategy:
@@ -733,10 +747,12 @@ jobs:
         - version: "14"
           distro: ubuntu-24.04-arm
           arch_flags: -march=armv8-a+fp+aes+sha2
+          plain: true
           # grep Features < /proc/cpuinfo | head -n 1 | awk '-F: ' '{print $2}' | sed 's/asimd //;s/evtstrm //;s/pmull //;s/sha1 //;s/crc32 //;s/atomics //;s/fphp //;s/asimd.. //g;s/cpuid //;s/asimd... //g;s/jscvt //;s/fcma //;s/lrcpc //;s/dcpop //;s/sm3 //;s/sha512 //;s/uscat //;s/ilrcpc //;s/pac. //g;s/dcpodp //;s/sveaes //;s/svebitperm //;s/svesha3 //;s/svesm4 //;s/flagm2 //;s/frint //;s/svei8mm //;s/svebf16 //' | tr ' ' '+'
         - version: "14"
           distro: ubuntu-24.04-arm
           arch_flags: -ffast-math -march=armv8-a+fp+aes+sha2
+          plain: true
         - version: "15"
           distro: ubuntu-24.04
         - version: "15"
@@ -831,44 +847,100 @@ jobs:
         - version: "20"
           distro: ubuntu-24.04-arm
           arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -O2
+        - version: "21"
+          distro: ubuntu-24.04
+          arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword
+        - version: "21"
+          distro: ubuntu-24.04
+          arch_flags: -ffast-math -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -Wno-nan-infinity-disabled
+        - version: "21"
+          distro: ubuntu-24.04
+          arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -O2
+        - version: "21"
+          distro: ubuntu-24.04-arm
+          arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword
+        - version: "21"
+          distro: ubuntu-24.04-arm
+          arch_flags: -ffast-math -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -Wno-nan-infinity-disabled
+        - version: "21"
+          distro: ubuntu-24.04-arm
+          arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -O2
+        # - version: "22"
+        #   distro: ubuntu-24.04
+        #   arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword
+        # - version: "22"
+        #   distro: ubuntu-24.04
+        #   arch_flags: -ffast-math -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -Wno-nan-infinity-disabled
+        # - version: "22"
+        #   distro: ubuntu-24.04
+        #   arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -O2
+        # - version: "22"
+        #   distro: ubuntu-24.04-arm
+        #   arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword
+        # - version: "22"
+        #   distro: ubuntu-24.04-arm
+        #   plain: true
+        #   arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword
+        # - version: "22"
+        #   distro: ubuntu-24.04-arm
+        #   arch_flags: -ffast-math -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -Wno-nan-infinity-disabled
+        # - version: "22"
+        #   distro: ubuntu-24.04-arm
+        #   arch_flags: -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword -O2
+        - version: "21"  # armv7
+          distro: ubuntu-24.04-arm
+          arch_flags: --target=arm-linux-gnueabihf -march=armv7-a -mfpu=neon -isystem=/usr/arm-linux-gnueabihf/include -Wno-unsafe-buffer-usage -Wno-switch-default -Wno-c++-keyword
+          pkg: libstdc++-16-dev-armhf-cross
+          plain: true
     runs-on: ${{ matrix.distro }}
     env:
-      CFLAGS: -march=native ${{ matrix.arch_flags }} -Wall -Weverything -Werror -fno-lax-vector-conversions
-      CXXFLAGS: -march=native ${{ matrix.arch_flags }} -Wall -Weverything -Werror -fno-lax-vector-conversions
+      CFLAGS: ${{ matrix.arch_flags }} ${{ case(
+        matrix.plain == true, '-Wall -Weverything -Werror',
+        '-march=native -Wall -Weverything -Werror') }} -fno-lax-vector-conversions
+      CXXFLAGS: ${{ matrix.arch_flags }} ${{ case(
+        matrix.plain == true, '-Wall -Weverything -Werror',
+        '-march=native -Wall -Weverything -Werror') }} -fno-lax-vector-conversions
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     - id: cpu
       name: CPU Information
       run: |
         cat /proc/cpuinfo
-        echo "model_name=$(grep -m1 'model name' < /proc/cpuinfo || grep -m1 Features < /proc/cpuinfo | awk '-F: ' '{ print $2}' | tr '-' '_')" >> "$GITHUB_OUTPUT"
-    - run: sudo apt-get update
-    - name: ccache
-      uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        key: ${{ github.job }}-${{ matrix.version }}-${{ matrix.distro }}-${{ matrix.arch_flags }}-${{ steps.cpu.outputs.model_name }}
-        evict-old-files: job
-        verbose: 2
-    - name: Install PPAs
+    - name: enable armhf
+      if: ${{ matrix.pkg == 'libstdc++-16-dev-armhf-cross' }}
+      run: sudo dpkg --add-architecture armhf && sudo apt-get update && sudo apt-get install -y libstdc++6:armhf
+    - name: Install PPAs for Ubuntu 22.04
       if: ${{ matrix.distro == 'ubuntu-22.04' }}
       run: |
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test
         sudo add-apt-repository ppa:savoury1/build-tools
         sudo add-apt-repository ppa:savoury1/display
         sudo add-apt-repository ppa:savoury1/llvm-defaults-16
+    - name: Install newer clang
+      if: ${{ matrix.version == '21' || matrix.version == '22' }}
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{ matrix.version }}
     - name: Install APT Dependencies
       run: |
+        sudo add-apt-repository ppa:misterc/gcc-snapshot-latest-lts
+        sudo add-apt-repository ppa:stephanosio/ccache
         sudo add-apt-repository ppa:canonical-x/x-staging
         sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
-        sudo apt-get update
-        sudo apt-get -y --no-install-recommends install gcovr ninja-build pipx \
-          clang-${{ matrix.version }}
-        pipx install meson==0.55.1
+        sudo apt-get -y --no-install-recommends install ninja-build pipx \
+          clang-${{ matrix.version }} ccache ${{ matrix.pkg }}
+        pipx install meson==1.3.2
         sudo rm /usr/bin/gcc /usr/bin/g++ /usr/bin/cc /usr/bin/c++
         sudo ln -s "$(command -v clang-${{ matrix.version }})" /usr/bin/cc
         sudo ln -s "$(command -v clang-${{ matrix.version }})" /usr/bin/c++
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ github.job }}-${{ matrix.version }}-${{ matrix.distro }}-${{ matrix.arch_flags }}${{ matrix.plain }}
+        verbose: 2
     - name: add ccache to the build path
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
@@ -879,33 +951,17 @@ jobs:
     - name: Test
       run: |
         # shellcheck disable=SC2046
-        meson test -C build --print-errorlogs $(meson test -C build --list | grep -v emul)
+        meson test -C build --print-errorlogs
 
   macos:
     strategy:
       fail-fast: false
       matrix:
         # https://www.jessesquires.com/blog/2020/01/06/selecting-an-xcode-version-on-github-ci/
-        # https://github.com/actions/runner-images/blob/main/images/macos/macos-13-Readme.md#xcode
         # https://github.com/actions/runner-images/blob/main/images/macos/macos-14-arm64-Readme.md#xcode
         # https://github.com/actions/runner-images/blob/main/images/macos/macos-15-arm64-Readme.md#xcode
         # https://trac.macports.org/wiki/XcodeVersionInfo
         include:
-          - xcode: "14.2"
-            os: macos-13
-            arch_flags: -Wno-poison-system-directories  # due to meson test
-          - xcode: "14.3.1"
-            os: macos-13
-            arch_flags: -Wno-poison-system-directories  # due to meson test
-          - xcode: "15.0.1"
-            os: macos-13
-            arch_flags: -Wno-poison-system-directories  # due to meson test
-          - xcode: "15.1"
-            os: macos-13
-            arch_flags: -Wno-poison-system-directories  # due to meson test
-          - xcode: "15.2"
-            os: macos-13
-            arch_flags: -Wno-poison-system-directories  # due to meson test
           - xcode: "15.2"
             os: macos-14  # arm64
             arch_flags: -march=native -Wno-poison-system-directories
@@ -916,23 +972,27 @@ jobs:
             arch_flags: -march=native -Wno-poison-system-directories
               # "-Wno-poison-system-directories": due to meson test
               # "-march=native": without, or with -mcpu=apple-m1 then unavailable __ARM_FEATURE_s get enabled
-          - xcode: "15.4"
+          - xcode: "15.4"  # clang 15?
             os: macos-14  # arm64
             arch_flags: -march=native -Wno-poison-system-directories
               # "-Wno-poison-system-directories": due to meson test
               # "-march=native": without, or with -mcpu=apple-m1 then unavailable __ARM_FEATURE_s get enabled
-          - xcode: "16.0"
+          - xcode: "16.0"  # clang 16?
             os: macos-15  # arm64
-            arch_flags: -march=native -Wno-poison-system-directories -U_LIBCPP_ENABLE_ASSERTIONS
+            arch_flags: -march=native -Wno-poison-system-directories
               # "-Wno-poison-system-directories": due to meson test
               # "-march=native": without, or with -mcpu=apple-m1 then unavailable __ARM_FEATURE_s get enabled
+          - xcode: "26.2"  # clang 17?
+            os: macos-26  # arm64
+            arch_flags: -Wno-poison-system-directories -Wno-switch-default
+              # "-Wno-poison-system-directories": due to meson test
     runs-on: ${{ matrix.os }}
     env:
       DEVELOPER_DIR:  /Applications/Xcode_${{ matrix.xcode }}.app
       CFLAGS: ${{ matrix.arch_flags }} -Wall -Weverything -Werror -Wno-complex-component-init
       CXXFLAGS: ${{ matrix.arch_flags }} -Wall -Weverything -Werror -Wno-complex-component-init
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
     # - name: System Information
@@ -943,7 +1003,6 @@ jobs:
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}-${{ matrix.os }}-${{ matrix.xcode }}
-        evict-old-files: job
         verbose: 2
     - name: Python install bug workaround # https://github.com/actions/setup-python/issues/577
       run: |
@@ -968,11 +1027,11 @@ jobs:
       CFLAGS: -Wall -Werror -march=native -fp-model precise
       CXXFLAGS: -Wall -Werror -march=native -fp-model precise
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: CPU Information
       run: cat /proc/cpuinfo
     - name: Install APT Dependencies
-      run: sudo apt-get install -y --no-install-recommends ninja-build pipx && pipx install meson==0.64
+      run: sudo apt-get install -y --no-install-recommends ninja-build pipx && pipx install meson==1.3.2
     - name: Install ICC
       run: |
         # download the key to system keyring

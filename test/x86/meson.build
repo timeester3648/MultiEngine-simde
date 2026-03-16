@@ -1,3 +1,5 @@
+fs = import('fs')
+
 simde_test_x86_tests = [
   'mmx',
   'sse',
@@ -14,6 +16,7 @@ simde_test_x86_tests = [
   'clmul',
   'svml',
   'xop',
+  'bmi',
   'aes'
 ]
 
@@ -25,7 +28,7 @@ foreach name : simde_test_x86_tests
   foreach lang : ['c', 'cpp']
     source_file = name + '.c'
     if lang == 'cpp'
-      source_file = configure_file(input: name + '.c', output: name + '.cpp', copy: true)
+      source_file = fs.copyfile(name + '.c', name + '.cpp')
     endif
     simde_test_x86_sources += source_file
 

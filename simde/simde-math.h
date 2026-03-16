@@ -103,10 +103,11 @@ SIMDE_DISABLE_UNWANTED_DIAGNOSTICS
    * macro libc++ uses. */
   #if defined(isnan) || (defined(_LIBCPP_MATH_H) && !defined(_LIBCPP_CMATH))
     #define SIMDE_MATH_HAVE_MATH_H
-  #elif defined(__cplusplus)
+  #elif defined(__cplusplus) && !defined(HEDLEY_MSVC_VERSION)
     #define SIMDE_MATH_HAVE_CMATH
   #endif
-#elif defined(__has_include)
+#endif
+#if defined(__has_include) && !(defined(SIMDE_MATH_HAVE_MATH_H) || defined(SIMDE_MATH_HAVE_CMATH))
   #if defined(__cplusplus) && (__cplusplus >= 201103L) && __has_include(<cmath>)
     #define SIMDE_MATH_HAVE_CMATH
     #include <cmath>
@@ -1915,7 +1916,7 @@ simde_math_adds_u32(uint32_t a, uint32_t b) {
     return vqadds_u32(a, b);
   #else
     uint32_t r = a + b;
-    r |= -(r < a);
+    r |= HEDLEY_STATIC_CAST(uint32_t, -(r < a));
     return r;
   #endif
 }
@@ -1927,7 +1928,7 @@ simde_math_adds_u64(uint64_t a, uint64_t b) {
     return vqaddd_u64(a, b);
   #else
     uint64_t r = a + b;
-    r |= -(r < a);
+    r |= HEDLEY_STATIC_CAST(uint64_t, -(r < a));
     return r;
   #endif
 }
@@ -2043,7 +2044,7 @@ simde_math_subs_u32(uint32_t a, uint32_t b) {
     return vqsubs_u32(a, b);
   #else
     uint32_t res = a - b;
-    res &= -(res <= a);
+    res &= HEDLEY_STATIC_CAST(uint32_t, -(res <= a));
     return res;
   #endif
 }
@@ -2055,7 +2056,7 @@ simde_math_subs_u64(uint64_t a, uint64_t b) {
     return vqsubd_u64(a, b);
   #else
     uint64_t res = a - b;
-    res &= -(res <= a);
+    res &= HEDLEY_STATIC_CAST(uint64_t, -(res <= a));
     return res;
   #endif
 }

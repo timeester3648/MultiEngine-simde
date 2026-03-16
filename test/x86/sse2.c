@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2019 Evan Nemerson <evan@nemerson.com>
+/* SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -19,6 +19,16 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
+ * Copyright:
+ *   2017-2021 Evan Nemerson <evan@nemerson.com>
+ *   2020-2025 Michael R. Crusoe <crusoe@debian.org>
+ *   2020      Himanshi Mathur <himanshi18037@iiitd.ac.in>
+ *   2020      Christopher Moore <moore@free.fr>
+ *   2020      Masahiro Kitagawa <arctica0316@gmail.com>
+ *   2021      Jean Pierre Cimalando <jp-dev@inbox.ru>
+ *   2025      aqrit <4021602+aqrit@users.noreply.github.com>
+ *   2026      Max Slater <max@thenumb.at>
  */
 
 #define SIMDE_TESTS_CURRENT_ISAX sse2
@@ -3270,6 +3280,16 @@ test_simde_mm_cvtpd_epi32 (SIMDE_MUNIT_TEST_ARGS) {
     { { HEDLEY_STATIC_CAST(simde_float64, HEDLEY_STATIC_CAST(int64_t, INT32_MIN) - 1), HEDLEY_STATIC_CAST(int64_t, INT32_MIN) + 100 },
       {              INT32_MIN, -INT32_C(  2147483548),  INT32_C(           0),  INT32_C(           0) } },
     #endif
+    #if !defined(SIMDE_FAST_ROUND_TIES)
+    { { SIMDE_FLOAT64_C(-1.50), SIMDE_FLOAT64_C(1.50) },
+      { -INT32_C(           2),  INT32_C(          2) } },
+    { { SIMDE_FLOAT64_C(-2.50), SIMDE_FLOAT64_C(2.50) },
+      { -INT32_C(           2),  INT32_C(          2) } },
+    { { SIMDE_FLOAT64_C(-3.50), SIMDE_FLOAT64_C(3.50) },
+      { -INT32_C(           4),  INT32_C(          4) } },
+    { { SIMDE_FLOAT64_C(-4.50), SIMDE_FLOAT64_C(4.50) },
+      { -INT32_C(           4),  INT32_C(          4) } },
+    #endif
     { { SIMDE_FLOAT64_C(  -220.31), SIMDE_FLOAT64_C(   685.08) },
       { -INT32_C(         220),  INT32_C(         685),  INT32_C(           0),  INT32_C(           0) } },
     { { SIMDE_FLOAT64_C(  -164.88), SIMDE_FLOAT64_C(   725.51) },
@@ -3308,6 +3328,16 @@ test_simde_mm_cvtpd_pi32 (SIMDE_MUNIT_TEST_ARGS) {
       {              INT32_MIN,  INT32_C(  2147483547) } },
     { { HEDLEY_STATIC_CAST(simde_float64, HEDLEY_STATIC_CAST(int64_t, INT32_MIN) - 1), HEDLEY_STATIC_CAST(int64_t, INT32_MIN) + 100 },
       {              INT32_MIN, -INT32_C(  2147483548) } },
+    #endif
+    #if !defined(SIMDE_FAST_ROUND_TIES)
+    { { SIMDE_FLOAT64_C(-1.50), SIMDE_FLOAT64_C(1.50) },
+      { -INT32_C(           2),  INT32_C(          2) } },
+    { { SIMDE_FLOAT64_C(-2.50), SIMDE_FLOAT64_C(2.50) },
+      { -INT32_C(           2),  INT32_C(          2) } },
+    { { SIMDE_FLOAT64_C(-3.50), SIMDE_FLOAT64_C(3.50) },
+      { -INT32_C(           4),  INT32_C(          4) } },
+    { { SIMDE_FLOAT64_C(-4.50), SIMDE_FLOAT64_C(4.50) },
+      { -INT32_C(           4),  INT32_C(          4) } },
     #endif
     { { SIMDE_FLOAT64_C(  -220.31), SIMDE_FLOAT64_C(   685.08) },
       { -INT32_C(         220),  INT32_C(         685) } },
@@ -4689,11 +4719,20 @@ test_simde_mm_loadu_si64 (SIMDE_MUNIT_TEST_ARGS) {
       {  INT64_C( 7628307720165229322),  INT64_C(                   0) } }
   };
 
+  #if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(13,0,0)
+  HEDLEY_DIAGNOSTIC_PUSH
+  #pragma GCC diagnostic ignored "-Wanalyzer-allocation-size"
+  // False positive that goes away if the underlying call to native
+  // _mm_loadu_si64 is removed
+  #endif
   for (size_t i = 0 ; i < (sizeof(test_vec) / sizeof(test_vec[0])) ; i++) {
-    int64_t a = test_vec[i].a;
+    const int64_t a = test_vec[i].a;
     simde__m128i r = HEDLEY_CONCAT(simde,_mm_loadu_si64)(&a);
     simde_test_x86_assert_equal_i64x2(r, simde_x_mm_loadu_epi64(test_vec[i].r));
   }
+  #if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(13,0,0)
+  HEDLEY_DIAGNOSTIC_POP
+  #endif
 
   return 0;
 }
@@ -4981,7 +5020,15 @@ test_simde_mm_min_pd(SIMDE_MUNIT_TEST_ARGS) {
     simde__m128d a;
     simde__m128d b;
     simde__m128d r;
-  } test_vec[10] = {
+  } test_vec[] = {
+    #if !defined(SIMDE_FAST_NANS) && !defined(SIMDE_ARCH_WASM_RELAXED_SIMD)
+    { simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(            -480.90)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(        319.11), SIMDE_FLOAT64_C(     SIMDE_MATH_NAN)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(        319.11), SIMDE_FLOAT64_C(     SIMDE_MATH_NAN)) },
+    { simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(     SIMDE_MATH_NAN)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(SIMDE_MATH_INFINITY)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(SIMDE_MATH_INFINITY)) },
+    #endif
     { simde_mm_set_pd(SIMDE_FLOAT64_C( -927.67), SIMDE_FLOAT64_C( -514.32)),
       simde_mm_set_pd(SIMDE_FLOAT64_C(  342.71), SIMDE_FLOAT64_C(  927.58)),
       simde_mm_set_pd(SIMDE_FLOAT64_C( -927.67), SIMDE_FLOAT64_C( -514.32)) },
@@ -5199,7 +5246,15 @@ test_simde_mm_max_pd(SIMDE_MUNIT_TEST_ARGS) {
     simde__m128d a;
     simde__m128d b;
     simde__m128d r;
-  } test_vec[8] = {
+  } test_vec[] = {
+    #if !defined(SIMDE_FAST_NANS) && !defined(SIMDE_ARCH_WASM_RELAXED_SIMD)
+    { simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(     -480.90)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(        319.11), SIMDE_FLOAT64_C(     SIMDE_MATH_NAN)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(        319.11), SIMDE_FLOAT64_C(     SIMDE_MATH_NAN)) },
+    { simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(     SIMDE_MATH_NAN)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(SIMDE_MATH_INFINITY)),
+      simde_mm_set_pd(SIMDE_FLOAT64_C(SIMDE_MATH_NAN), SIMDE_FLOAT64_C(SIMDE_MATH_INFINITY)) },
+    #endif
     { simde_mm_set_pd(SIMDE_FLOAT64_C( -303.58), SIMDE_FLOAT64_C( -480.90)),
       simde_mm_set_pd(SIMDE_FLOAT64_C(  319.11), SIMDE_FLOAT64_C(  666.53)),
       simde_mm_set_pd(SIMDE_FLOAT64_C(  319.11), SIMDE_FLOAT64_C(  666.53)) },
@@ -8796,12 +8851,21 @@ test_simde_mm_storeu_si32 (SIMDE_MUNIT_TEST_ARGS) {
        INT32_C(   548763692) }
   };
 
+  #if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(13,0,0)
+  HEDLEY_DIAGNOSTIC_PUSH
+  #pragma GCC diagnostic ignored "-Wanalyzer-allocation-size"
+  // False positive that goes away if the underlying call to native
+  // _mm_storeu_si64 is removed
+  #endif
   for (size_t i = 0 ; i < (sizeof(test_vec) / sizeof(test_vec[0])) ; i++) {
     simde__m128i a = simde_x_mm_loadu_epi32(test_vec[i].a);
     int32_t r;
     HEDLEY_CONCAT(simde,_mm_storeu_si32)(&r, a);
     simde_assert_equal_i32(r, test_vec[i].r);
   }
+  #if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(13,0,0)
+  HEDLEY_DIAGNOSTIC_POP
+  #endif
 
   return 0;
 }
@@ -8830,12 +8894,21 @@ test_simde_mm_storeu_si64 (SIMDE_MUNIT_TEST_ARGS) {
        INT64_C(  407001106525339075) }
   };
 
+  #if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(13,0,0)
+  HEDLEY_DIAGNOSTIC_PUSH
+  #pragma GCC diagnostic ignored "-Wanalyzer-allocation-size"
+  // False positive that goes away if the underlying call to native
+  // _mm_loadu_si128 is removed
+  #endif
   for (size_t i = 0 ; i < (sizeof(test_vec) / sizeof(test_vec[0])) ; i++) {
     simde__m128i a = simde_x_mm_loadu_epi64(test_vec[i].a);
     int64_t r;
     HEDLEY_CONCAT(simde,_mm_storeu_si64)(&r, a);
     simde_assert_equal_i64(r, test_vec[i].r);
   }
+  #if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(13,0,0)
+  HEDLEY_DIAGNOSTIC_POP
+  #endif
 
   return 0;
 }
@@ -9819,6 +9892,11 @@ test_simde_mm_ucomilt_sd(SIMDE_MUNIT_TEST_ARGS) {
   return 0;
 }
 
+
+#if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(12,0,0)
+HEDLEY_DIAGNOSTIC_PUSH
+#pragma GCC diagnostic ignored "-Wanalyzer-use-of-uninitialized-value"
+#endif
 static int
 test_simde_mm_undefined_pd(SIMDE_MUNIT_TEST_ARGS) {
   simde__m128d z = simde_mm_setzero_pd();
@@ -9840,7 +9918,9 @@ test_simde_mm_undefined_si128(SIMDE_MUNIT_TEST_ARGS) {
 
   return 0;
 }
-
+#if defined(HEDLEY_GCC_VERSION) && HEDLEY_GCC_VERSION_CHECK(12,0,0)
+HEDLEY_DIAGNOSTIC_POP
+#endif
 
 static int
 test_simde_mm_ucomineq_sd(SIMDE_MUNIT_TEST_ARGS) {

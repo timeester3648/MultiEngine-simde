@@ -1,7 +1,7 @@
 project('SIMDe', 'c', 'cpp',
         default_options: ['c_std=c99'],
         license: 'MIT',
-        meson_version : '>=0.54.0',
+        meson_version : '>=0.64.0',
         version: '0.8.4')
 # also update SIMDE_VESION_* in simde/simde-common.h
 
@@ -501,6 +501,7 @@ if not meson.is_subproject()
       'simde/x86/avx512.h',
       'simde/x86/avx2.h',
       'simde/x86/avx.h',
+      'simde/x86/bmi.h',
       'simde/x86/clmul.h',
       'simde/x86/fma.h',
       'simde/x86/f16c.h',

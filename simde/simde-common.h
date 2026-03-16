@@ -1027,12 +1027,19 @@ HEDLEY_DIAGNOSTIC_POP
 #      if !(HEDLEY_GCC_VERSION_CHECK(10,3,0))
 #        define SIMDE_BUG_GCC_98521
 #      endif
-#    endif
-#    if !HEDLEY_GCC_VERSION_CHECK(9,4,0) && defined(SIMDE_ARCH_AARCH64)
-#      define SIMDE_BUG_GCC_94488
-#    endif
-#    if !HEDLEY_GCC_VERSION_CHECK(9,1,0) && defined(SIMDE_ARCH_AARCH64)
-#      define SIMDE_BUG_GCC_REV_264019
+#    elif defined(SIMDE_ARCH_AARCH64)
+#      if !HEDLEY_GCC_VERSION_CHECK(9,4,0)
+#        define SIMDE_BUG_GCC_94488
+#      endif
+#      if !HEDLEY_GCC_VERSION_CHECK(9,1,0)
+#        define SIMDE_BUG_GCC_REV_264019
+#      endif
+#      if HEDLEY_GCC_VERSION_CHECK(15,0,0) && !HEDLEY_GCC_VERSION_CHECK(16,1,0)
+#        define SIMDE_BUG_GCC_123584
+#      endif
+#      if !HEDLEY_GCC_VERSION_CHECK(10,2,0) && !defined(__OPTIMIZE__)
+#        define SIMDE_BUG_GCC_96174
+#      endif
 #    endif
 #    if (!HEDLEY_GCC_VERSION_CHECK(9,0,0) && !defined(SIMDE_ARCH_AARCH64)) || (!defined(SIMDE_ARCH_AARCH64) && defined(SIMDE_ARCH_ARM))
 #      define SIMDE_BUG_GCC_REV_260989
@@ -1056,24 +1063,26 @@ HEDLEY_DIAGNOSTIC_POP
 #      if !HEDLEY_GCC_VERSION_CHECK(12,0,0)
 #        define SIMDE_BUG_VEC_CPSGN_REVERSED_ARGS
 #      endif
-#    endif
-#    if defined(SIMDE_ARCH_X86) || defined(SIMDE_ARCH_AMD64)
-#      if !HEDLEY_GCC_VERSION_CHECK(10,2,0) && !defined(__OPTIMIZE__)
-#        define SIMDE_BUG_GCC_96174
-#      endif
-#    endif
-#    if defined(SIMDE_ARCH_ZARCH)
+#    elif defined(SIMDE_ARCH_ZARCH)
 #      define SIMDE_BUG_GCC_95782
 #      if HEDLEY_GCC_VERSION_CHECK(10,0,0)
 #        define SIMDE_BUG_GCC_101614
 #      endif
-#    endif
-#    if defined(SIMDE_ARCH_MIPS_MSA)
+#    elif defined(SIMDE_ARCH_MIPS_MSA)
 #      define SIMDE_BUG_GCC_97248
 #      if !HEDLEY_GCC_VERSION_CHECK(12,1,0)
 #        define SIMDE_BUG_GCC_100760
 #        define SIMDE_BUG_GCC_100761
 #        define SIMDE_BUG_GCC_100762
+#      endif
+#    elif defined(SIMDE_ARCH_LOONGARCH)
+#      if HEDLEY_GCC_VERSION_CHECK(16,0,0)
+#        define SIMDE_BUG_GCC_123807
+#      endif
+#      if defined(SIMDE_ARCH_LOONGARCH) && \
+           ((HEDLEY_GCC_VERSION_CHECK(14,0,0) && !HEDLEY_GCC_VERSION_CHECK(14,4,0)) || \
+            (HEDLEY_GCC_VERSION_CHECK(15,0,0) && !HEDLEY_GCC_VERSION_CHECK(15,2,0)))
+#        define SIMDE_BUG_GCC_121064
 #      endif
 #    endif
 #    if !defined(__OPTIMIZE__) && !(\
@@ -1081,6 +1090,9 @@ HEDLEY_DIAGNOSTIC_POP
        || (HEDLEY_GCC_VERSION_CHECK(10,4,0) && !(HEDLEY_GCC_VERSION_CHECK(11,0,0))) \
        || (HEDLEY_GCC_VERSION_CHECK(9,5,0) && !(HEDLEY_GCC_VERSION_CHECK(10,0,0))))
 #      define SIMDE_BUG_GCC_105339
+#    endif
+#    if defined(SIMDE_ARCH_LOONGARCH)
+#      define SIMDE_BUG_GCC_123766
 #    endif
 #  elif defined(__clang__)
 #    if defined(SIMDE_ARCH_AARCH64)
@@ -1154,6 +1166,9 @@ HEDLEY_DIAGNOSTIC_POP
 #      endif
 #      if HEDLEY_HAS_WARNING("-Wvector-conversion") && SIMDE_DETECT_CLANG_VERSION_NOT(11,0,0)
 #        define SIMDE_BUG_CLANG_44589
+#      endif
+#      if SIMDE_DETECT_CLANG_VERSION_CHECK(21,1,1) && SIMDE_DETECT_CLANG_VERSION_NOT(22,1,0)
+#        define SIMDE_BUG_CLANG_179057
 #      endif
 #      define SIMDE_BUG_CLANG_48673  // https://github.com/llvm/llvm-project/issues/48017
 #    endif
