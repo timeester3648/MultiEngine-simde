@@ -170,7 +170,7 @@ simde__m128i simde_mm256_cvtepi16_epi8(simde__m256i a) {
 #else
   SIMDE_VECTORIZE
   for (size_t i = 0; i < (sizeof(r_.i8) / sizeof(r_.i8[0])); i++) {
-    r_.i8[i] = a_.i16[i];
+    r_.i8[i] = HEDLEY_STATIC_CAST(int8_t, a_.i16[i]);
   }
 #endif
 
